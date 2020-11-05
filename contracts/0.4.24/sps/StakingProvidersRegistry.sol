@@ -41,9 +41,12 @@ contract StakingProvidersRegistry is IStakingProvidersRegistry, IsContract, Arag
 
     /// @dev Staking provider parameters and internal state
     struct StakingProvider {
+        // slot 1
         bool active;    // a flag indicating if the SP can participate in further staking and reward distribution
         address rewardAddress;  // Ethereum 1 address which receives steth rewards for this SP
+        // slot 2
         string name;    // human-readable name
+        // slot 3: getStakingProvidersMetrics depends on this slot position and layout
         uint64 stakingLimit;    // the maximum number of validators to stake for this SP
         uint64 stoppedValidators;   // number of signing keys which stopped validation (e.g. were slashed)
 
@@ -327,6 +330,41 @@ contract StakingProvidersRegistry is IStakingProvidersRegistry, IsContract, Arag
       */
     function getActiveStakingProvidersCount() external view returns (uint256) {
         return activeSPCount;
+    }
+
+    /**
+      * @notice Returns a tuple: the first element is the number of active staking providers;
+      * the second element contains packed metrics of all staking providers, including inactive.
+      * The second element is a tightly-packed byte array consisting of 33-byte chunks, with
+      * i-th chunk corresponding to the i-th staking provider and having the following layout:
+      * UK|TK|SV|SL|A, where UK is the number of used signing keys, TK is the total number of
+      * signing keys, SV is the number of stopped validators, and SL is staking limit, all
+      * 8-byte unsigned integers, and A is the active flag, a 1-byte unsigned integer (0 or 1).
+      */
+    function getStakingProvidersMetrics() external view returns (uint256 activeCount, bytes memory data) {
+        uint256 count = totalSPCount;
+        data = new bytes(33 * count);
+        for (uint256 i = 0; i < count; ++i) {
+            StakingProvider storage p = sps[i];
+            assembly {
+                // load the third slot of the StakingProvider struct containing UK,TK,SV,SL
+                // and store it into the first 32 bytes of the i-th chunk of the array
+                mstore(
+                    // the first 32 bytes of a byte array contain its length
+                    add(data, add(mul(i, 33), 32)),
+                    // we know that the offset inside a storage slot is always zero for a struct
+                    sload(add(p_slot, 2))
+                )
+                // store the active flag into the remaining byte of the i-th 33-byte chunk
+                mstore8(
+                    // (data + 32) + i*33 + 32
+                    add(data, add(mul(i, 33), 64)),
+                    // we know that the offset inside a storage slot is always zero for a struct
+                    and(sload(p_slot), 0x1)
+                )
+            }
+        }
+        activeCount = activeSPCount;
     }
 
     /**

@@ -676,34 +676,47 @@ contract DePool is IDePool, IsContract, Pausable, AragonApp {
 
     function _load_SP_cache() internal view returns (DepositLookupCacheEntry[] memory cache) {
         IStakingProvidersRegistry sps = getSPs();
-        cache = new DepositLookupCacheEntry[](sps.getActiveStakingProvidersCount());
-        if (0 == cache.length)
+
+        (uint256 activeCount, bytes memory data) = sps.getStakingProvidersMetrics();
+        require(0 == data.length % 33, "SP_REGISTRY_INCOSISTENT_DATALEN");
+
+        cache = new DepositLookupCacheEntry[](activeCount);
+        if (0 == activeCount)
             return cache;
 
-        uint256 idx = 0;
-        for (uint256 SP_id = sps.getStakingProvidersCount().sub(1); ; SP_id = SP_id.sub(1)) {
-            (
-                bool active, , ,
-                uint64 stakingLimit,
-                uint64 stoppedValidators,
-                uint64 totalSigningKeys,
-                uint64 usedSigningKeys
-            ) = sps.getStakingProvider(SP_id, false);
-            if (!active)
+        // data is a sequence of 33-byte chunks, i-th chunk corresponding to a staking provider
+        // with id i and having the following layout:
+        // usedSigningKeys | totalSigningKeys | stoppedValidators | stakingLimit | active,
+        // where the first 4 elements are 8-byte uints and the last element is a 1-byte uint
+        uint256 totalSPs = data.length / 33;
+        uint256 cacheIdx = 0;
+        for (uint256 i = 0; i < totalSPs; ++i) {
+            uint256 iData;
+            bool iActive;
+            assembly {
+                // get the i-th 33-byte chunk offset: iData + 32 + i*33
+                let offset := add(data, add(32, mul(i, 33)))
+                // and write its first 32 bytes to iData
+                iData := mload(offset)
+                // and its last, 33-rd, byte to iActive
+                iActive := and(mload(add(offset, 1)), 0x1)
+            }
+
+            if (!iActive)
                 continue;
 
-            DepositLookupCacheEntry memory cached = cache[idx++];
-            cached.id = SP_id;
-            cached.stakingLimit = stakingLimit;
-            cached.stoppedValidators = stoppedValidators;
-            cached.totalSigningKeys = totalSigningKeys;
-            cached.usedSigningKeys = usedSigningKeys;
-            cached.initialUsedSigningKeys = usedSigningKeys;
+            DepositLookupCacheEntry memory cached = cache[cacheIdx++];
+            cached.id = i;
 
-            if (0 == SP_id)
-                break;
+            cached.stakingLimit = iData & 0xffffffffffffffff;
+            cached.stoppedValidators = (iData >> 64) & 0xffffffffffffffff;
+            cached.totalSigningKeys = (iData >> 128) & 0xffffffffffffffff;
+            cached.usedSigningKeys = (iData >> 192) & 0xffffffffffffffff;
+
+            cached.initialUsedSigningKeys = cached.usedSigningKeys;
         }
-        require(idx == cache.length, "SP_REGISTRY_INCOSISTENCY");
+
+        require(cacheIdx == cache.length, "SP_REGISTRY_INCOSISTENCY");
     }
 
     /**

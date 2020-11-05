@@ -67,6 +67,17 @@ interface IStakingProvidersRegistry {
     function getActiveStakingProvidersCount() external view returns (uint256);
 
     /**
+      * @notice Returns a tuple: the first element is the number of active staking providers;
+      * the second element contains packed metrics of all staking providers, including inactive.
+      * The second element is a tightly-packed byte array consisting of 33-byte chunks, with
+      * i-th chunk corresponding to the i-th staking provider and having the following layout:
+      * UK|TK|SV|SL|A, where UK is the number of used signing keys, TK is the total number of
+      * signing keys, SV is the number of stopped validators, and SL is staking limit, all
+      * 8-byte unsigned integers, and A is the active flag, a 1-byte unsigned integer (0 or 1).
+      */
+    function getStakingProvidersMetrics() external view returns (uint256 activeCount, bytes memory data);
+
+    /**
       * @notice Returns the n-th staking provider
       * @param _id Staking provider id
       * @param _fullInfo If true, name will be returned as well
