@@ -1,4 +1,34 @@
-# testnet for local e2e tests
+# Testnet for local e2e tests
+
+## Prepare
+
+### For MacOS X
+
+Tested on MacOS Catalina 10.15.7 @MacBook Pro 15-inch 2018 2.6 GHz 6-core Intel Core i7 16GB RAM 2400MHz DDR4
+
+* install [homebrew](https://brew.sh/) `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"`
+* install gnu-sed `brew install gnu-sed`
+* install nvm [Node Version Manager](https://github.com/nvm-sh/nvm#installing-and-updating) 
+* install node 12.19 `nvm install 12.19 && nvm use node`
+
+### For Ubuntu
+
+TBD
+
+## Prepare
+
+* Go to the repository root and install yarn packages `cd lido-dao && yarn`
+* Create accounts.json from the given sample `cp accounts.sample.json accounts.json`
+
+## Start
+
+You should be in ./e2e directory
+
+See available invocation options `./startup.sh -h`
+
+For example, `./startup.sh -r -d` clears all the data, builds and deploys all the artifacts from scratch.
+
+During the startup, the script writes the key parameters into JSON file `deployed.sh` located in the repository root.
 
 ## ETH1 localnet contract addresses
 
