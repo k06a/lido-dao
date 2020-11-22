@@ -117,6 +117,24 @@ while test $# -gt 0; do
   esac
 done
 
+if [ -d "/usr/local/opt/gnu-sed/libexec/gnubin" ]; then
+  echo "It seems we are on MacOS X with brew and gnu sed installed"
+  echo "Using it instead the system sed"
+  PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
+fi
+TEMPFILE=".tmp_sed_check"
+echo oldtext > $TEMPFILE && grep -q "oldtext" $TEMPFILE
+if sed -i "s/old/new/" $TEMPFILE && grep -q "newtext" $TEMPFILE; then
+  rm -f $TEMPFILE
+  echo "sed behaves good"
+else
+  rm -f $TEMPFILE
+  echo "it seems, you are on MacOS X. You should install brew and GNU version of sed utility"
+  echo "    /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)\""
+  echo "    brew install gnu-sed"
+  exit
+fi
+
 if [ $RESET ]; then
   echo "Cleanup"
   docker-compose down -v --remove-orphans
